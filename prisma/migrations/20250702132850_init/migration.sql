@@ -14,7 +14,7 @@ CREATE TABLE "user" (
     "email" TEXT NOT NULL,
     "emailVerified" BOOLEAN NOT NULL,
     "image" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "user_pkey" PRIMARY KEY ("id")
@@ -72,6 +72,7 @@ CREATE TABLE "project" (
     "description" TEXT,
     "slug" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "apiProtection" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "userId" TEXT NOT NULL,
@@ -80,11 +81,39 @@ CREATE TABLE "project" (
 );
 
 -- CreateTable
+CREATE TABLE "api_key" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "lastUsedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "api_key_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "rate_limit" (
+    "id" TEXT NOT NULL,
+    "apiKeyId" TEXT NOT NULL,
+    "method" TEXT NOT NULL,
+    "requestCount" INTEGER NOT NULL DEFAULT 0,
+    "resetDate" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "rate_limit_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "endpoint" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
+    "fileUrl" TEXT,
     "fileName" TEXT NOT NULL,
     "fileType" "FileType" NOT NULL,
     "fileSize" INTEGER NOT NULL,
@@ -106,11 +135,12 @@ CREATE TABLE "api_call" (
     "path" TEXT NOT NULL,
     "query" JSONB,
     "headers" JSONB,
-    "response" JSONB,
+    "response" TEXT,
     "statusCode" INTEGER NOT NULL,
     "duration" INTEGER,
     "ipAddress" TEXT,
     "userAgent" TEXT,
+    "apiKeyId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "endpointId" TEXT NOT NULL,
 
@@ -127,6 +157,12 @@ CREATE UNIQUE INDEX "session_token_key" ON "session"("token");
 CREATE UNIQUE INDEX "project_slug_key" ON "project"("slug");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "api_key_key_key" ON "api_key"("key");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "rate_limit_apiKeyId_method_resetDate_key" ON "rate_limit"("apiKeyId", "method", "resetDate");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "endpoint_projectId_slug_key" ON "endpoint"("projectId", "slug");
 
 -- AddForeignKey
@@ -137,6 +173,12 @@ ALTER TABLE "account" ADD CONSTRAINT "account_userId_fkey" FOREIGN KEY ("userId"
 
 -- AddForeignKey
 ALTER TABLE "project" ADD CONSTRAINT "project_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "api_key" ADD CONSTRAINT "api_key_userId_fkey" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "rate_limit" ADD CONSTRAINT "rate_limit_apiKeyId_fkey" FOREIGN KEY ("apiKeyId") REFERENCES "api_key"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "endpoint" ADD CONSTRAINT "endpoint_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
