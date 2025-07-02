@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  name          String
+  role          UserRole  @default(USER)
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  projects      Project[]
+  apiKeys       ApiKey[] // NEW: User's API keys
+
+  @@unique([email])
+  @@map("user")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}
+
+model Project {
+  id            String     @id @default(cuid())
+  title         String
+  description   String?
+  slug          String     @unique
+  isActive      Boolean    @default(true)
+  apiProtection Boolean    @default(false) // NEW: API protection toggle
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoints     Endpoint[]
+
+  @@map("project")
+}
+
+model ApiKey {
+  id         String      @id @default(cuid())
+  name       String // User-friendly name for the key
+  key        String      @unique // The actual API key
+  isActive   Boolean     @default(true)
+  lastUsedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rateLimits RateLimit[]
+
+  @@map("api_key")
+}
+
+model RateLimit {
+  id           String   @id @default(cuid())
+  apiKeyId     String
+  method       String // GET, POST, PATCH, DELETE
+  requestCount Int      @default(0)
+  resetDate    DateTime // When the counter resets (daily)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  apiKey       ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, method, resetDate])
+  @@map("rate_limit")
+}
+
+model Endpoint {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String // For URL-friendly endpoint identification
+  description String?
+  fileUrl     String?
+  fileName    String // Original file name
+  fileType    FileType
+  fileSize    Int // Size in bytes
+  recordCount Int       @default(0) // Number of records in the dataset
+  isActive    Boolean   @default(true)
+  jsonData    Json // The converted JSON data from CSV/Excel
+  schema      Json? // Optional: Store the data schema/structure
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  apiCalls    ApiCall[]
+
+  @@unique([projectId, slug]) // Ensure unique endpoint slug within a project
+  @@map("endpoint")
+}
+
+enum FileType {
+  CSV
+  EXCEL
+  XLSX
+  XLS
+}
+
+model ApiCall {
+  id         String   @id @default(cuid())
+  method     String // GET, POST, PATCH, DELETE
+  path       String // The API path that was called
+  query      Json? // Query parameters
+  headers    Json? // Request headers
+  response   String? // Response data as string
+  statusCode Int // HTTP status code
+  duration   Int? // Response time in milliseconds
+  ipAddress  String?
+  userAgent  String?
+  apiKeyId   String? // NEW: Track which API key was used
+  createdAt  DateTime @default(now())
+  endpointId String
+  endpoint   Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@map("api_call")
+}
